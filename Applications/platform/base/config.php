@@ -9,7 +9,15 @@ if(file_exists($envFile)){
     $envConfigure = parse_ini_file($envFile, TRUE);
     define('ENVFILE', $envFile);
 }else{
-    die('System configure error.');
+    echo 'System configure error.';
     Worker::stopAll();
 }
+
+define('MYSQL_HOST', $envConfigure['COMMON']['MYSQL_HOST']);
+define('MYSQL_PORT', $envConfigure['COMMON']['MYSQL_PORT']);
+define('MYSQL_USER', $envConfigure['COMMON']['MYSQL_USER']);
+define('MYSQL_PASSWORD', $envConfigure['COMMON']['MYSQL_PASSWORD']);
+define('MYSQL_DATABASE', $envConfigure['COMMON']['MYSQL_DATABASE']);
+
+define('TIME_INTERVAL', $envConfigure['ENVIRONMENT']['TIME_INTERVAL']);
 

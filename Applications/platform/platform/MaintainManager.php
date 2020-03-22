@@ -1,10 +1,8 @@
 <?php
-
-require_once __DIR__ . '/../../../vendor/mysql-master/src/Connection.php';
-require_once __DIR__ . '/PlayerManager.php';
-require_once __DIR__ . '/HttpManager.php';
-
-class PlatformDB
+require_once __DIR__ . '/MessageDefine.php';
+require_once __DIR__ . '/Platform.php';
+use \GatewayWorker\Lib\Gateway;
+class MaintainManager
 {
 
     //静态变量保存全局实例
@@ -23,15 +21,18 @@ class PlatformDB
         return self::$_instance;
     }
 
-
-    private static $db = null;
-
-
-    public function initDB(){
-        if(self::$db == null){
-            echo "[Platform DB success]\n";
-            self::$db = new \Workerman\MySQL\Connection('127.0.0.1', '3306', 'root', 'q%G2@QK4', 'test');
+    public function onSocketMessage($client_id,$MainID,$msg){
+        switch ($MainID){
+            case 1:
+                $this->checkStatus($client_id,$msg);
+                break;
+            default:
+                break;
         }
     }
 
+    public function checkStatus($client_id,$msg){
+        $status = Platform::$pheanstalk->statsTube($msg);
+        Gateway::sendToClient($client_id, json_encode($status));
+    }
 }
