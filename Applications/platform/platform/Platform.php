@@ -131,9 +131,9 @@ class Platform
     // 执行sql
     public function sqlQueue($job,$implement){
         if (empty($implement['param'])){
-            self::$db->query($implement['sql']);
+            @self::$db->query($implement['sql']);
         }else{
-            self::$db->query($implement['sql'],$implement['param']);
+            @self::$db->query($implement['sql'],$implement['param']);
         }
         $this->cleanQueue($job);
     }
@@ -158,7 +158,7 @@ class Platform
     }
     // 执行命令行请求
     public function phpQueue($job,$implement){
-        shell_exec($implement);
+        @shell_exec($implement);
         $this->cleanQueue($job);
     }
     // 完成异步任务清理
