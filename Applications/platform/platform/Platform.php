@@ -3,7 +3,7 @@
 use Workerman\Worker;
 use Pheanstalk\Pheanstalk;
 use Workerman\Lib\Timer;
-
+use MySQL\Connection;
 class Platform
 {
 
@@ -13,7 +13,7 @@ class Platform
     private function __construct() {
         self::$pheanstalk = new Pheanstalk('127.0.0.1',11300);
         self::$tubeName =  self::$pheanstalkQueue[self::$_workerId];
-        self::$db = new \Workerman\MySQL\Connection(MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE);
+        self::$db = new Connection(MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE);
     }
     //私有克隆函数，防止外办克隆对象
     private function __clone() {
@@ -62,21 +62,23 @@ class Platform
         }
         // 获取管道状态
         $status = self::$pheanstalk->statsTube(self::$tubeName);
+        $jobsCount = $status['current-jobs-ready'];
         // 管道中拥有待处理则进行
-        if ($status['current-jobs-ready'] > 0){
+        if ($jobsCount > 0){
             // 删除检查管道定时器
             Timer::del($this->statusTime_id);
-            $this->time_id = Timer::add(0.1, function() use ($status)
+            $this->time_id = Timer::add(0.01, function() use ($status,&$jobsCount)
             {
-                $status = self::$pheanstalk->statsTube(self::$tubeName);
                 $this->takeoutQueue();
-                if ($status['current-jobs-ready'] <= 0){
+                --$jobsCount;
+                if ($jobsCount <= 0){
                     $status = self::$pheanstalk->statsTube(self::$tubeName);
                     if ($status['current-jobs-ready'] == 0){
                         // 目前队列处理完毕 处理定时器关闭 检查定时器打开
                         Timer::del($this->time_id);
                         $this->checkQueueStatus();
                     }
+                    $jobsCount = $status['current-jobs-ready'];
                 }
             },[],true);
         }
@@ -85,6 +87,18 @@ class Platform
     /**
      * type => 1:sql;2:http;3:php
      * implement => 可执行内容
+     { * sql队列
+        * sql sql语句
+        * param 请求数组
+     }
+     { * http队列
+        * action Post/Get 方式
+        * url 请求域名
+        * param 请求数组
+     }
+     { * php队列
+        * cmd 执行语句
+     }
      * delay => 延迟时间
      */
     // 取出管道中待处理数据
@@ -116,22 +130,36 @@ class Platform
 
     // 执行sql
     public function sqlQueue($job,$implement){
-        self::$db->row($implement);
+        if (empty($implement['param'])){
+            self::$db->query($implement['sql']);
+        }else{
+            self::$db->query($implement['sql'],$implement['param']);
+        }
+        $this->cleanQueue($job);
     }
     // 执行http curl请求
     public function httpQueue($job,$implement){
+        $url = $implement['url'];
+        if (strcasecmp($implement['action'],'GET') == 0 && !empty($implement['param'])){
+            $url .= '?' . http_build_query($implement['param']);
+        }
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $implement);
+        curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
+        if (strcasecmp($implement['action'],'POST') == 0 && !empty($implement['param'])){
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $implement['param']);
+        }
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
         $output = curl_exec($ch);
         curl_close($ch);
+        $this->cleanQueue($job);
     }
     // 执行命令行请求
     public function phpQueue($job,$implement){
-        popen($implement,'r');
+        shell_exec($implement);
+        $this->cleanQueue($job);
     }
     // 完成异步任务清理
     public function cleanQueue($job){

@@ -1,5 +1,5 @@
 <?php
-namespace Workerman\MySQL;
+namespace MySQL;
 
 use Exception;
 use PDO;
@@ -1732,13 +1732,19 @@ class Connection
      */
     protected function execute($query, $parameters = "")
     {
+        $is_assoc = array_keys($parameters) !== range(0, count($parameters) - 1);
         try {
             $this->sQuery = @$this->pdo->prepare($query);
             $this->bindMore($parameters);
             if (!empty($this->parameters)) {
                 foreach ($this->parameters as $param) {
                     $parameters = explode("\x7F", $param);
-                    $this->sQuery->bindParam($parameters[0], $parameters[1]);
+                    if ($is_assoc){
+                        $key = $parameters[0];
+                    }else{
+                        $key = $parameters[0] + 1;
+                    }
+                    $this->sQuery->bindParam($key, $parameters[1]);
                 }
             }
             $this->success = $this->sQuery->execute();
@@ -1754,7 +1760,12 @@ class Connection
                     if (!empty($this->parameters)) {
                         foreach ($this->parameters as $param) {
                             $parameters = explode("\x7F", $param);
-                            $this->sQuery->bindParam($parameters[0], $parameters[1]);
+                            if ($is_assoc){
+                                $key = $parameters[0];
+                            }else{
+                                $key = $parameters[0] + 1;
+                            }
+                            $this->sQuery->bindParam($key, $parameters[1]);
                         }
                     }
                     $this->success = $this->sQuery->execute();

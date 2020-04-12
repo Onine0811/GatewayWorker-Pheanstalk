@@ -21,7 +21,7 @@ class ComposerStaticIniteee497db65f04dd992746a8014a3be3a
             ),
         'M' =>
             array (
-                'Pheanstalk\\' => 12,
+                'Mysql\\' => 12,
             ),
     );
 
